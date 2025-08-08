@@ -75,39 +75,91 @@ def create_spark_spread_chart(electricity_prices, gas_prices, efficiency=0.58):
     
     return fig
 
+# def create_merit_order_chart(dispatch_data):
+#     """
+#     Create merit order stack chart
+#     """
+#     # Sort by marginal cost
+#     sorted_data = dispatch_data.sort_values('marginal_cost')
+    
+#     # Calculate cumulative capacity
+#     sorted_data['cumulative_capacity'] = sorted_data['capacity_mw'].cumsum()
+    
+#     fig = go.Figure()
+    
+#     # Create step chart for merit order
+#     for i, row in sorted_data.iterrows():
+#         start_capacity = row['cumulative_capacity'] - row['capacity_mw']
+#         end_capacity = row['cumulative_capacity']
+        
+#         fig.add_trace(go.Scatter(
+#             x=[start_capacity, end_capacity, end_capacity, start_capacity, start_capacity],
+#             y=[row['marginal_cost'], row['marginal_cost'], 
+#                row['marginal_cost'], row['marginal_cost'], row['marginal_cost']],
+#             fill='toself',
+#             name=row['name'],
+#             mode='lines',
+#             line=dict(width=0.5)
+#         ))
+    
+#     fig.update_layout(
+#         title="Merit Order Curve",
+#         xaxis_title="Cumulative Capacity (MW)",
+#         yaxis_title="Marginal Cost (EUR/MWh)",
+#         template=PLOT_THEME,
+#         showlegend=True
+#     )
+    
+#     return fig
+
+
+
 def create_merit_order_chart(dispatch_data):
     """
     Create merit order stack chart
     """
+    if dispatch_data.empty:
+        return go.Figure().add_annotation(text="No dispatch data", showarrow=False)
+    
     # Sort by marginal cost
     sorted_data = dispatch_data.sort_values('marginal_cost')
     
-    # Calculate cumulative capacity
-    sorted_data['cumulative_capacity'] = sorted_data['capacity_mw'].cumsum()
-    
     fig = go.Figure()
     
-    # Create step chart for merit order
-    for i, row in sorted_data.iterrows():
-        start_capacity = row['cumulative_capacity'] - row['capacity_mw']
-        end_capacity = row['cumulative_capacity']
+    # Create stepped merit order curve
+    cumulative_capacity = 0
+    
+    for _, row in sorted_data.iterrows():
+        start_capacity = cumulative_capacity
+        end_capacity = cumulative_capacity + row['capacity_mw']
         
         fig.add_trace(go.Scatter(
-            x=[start_capacity, end_capacity, end_capacity, start_capacity, start_capacity],
-            y=[row['marginal_cost'], row['marginal_cost'], 
-               row['marginal_cost'], row['marginal_cost'], row['marginal_cost']],
-            fill='toself',
-            name=row['name'],
+            x=[start_capacity, end_capacity],
+            y=[row['marginal_cost'], row['marginal_cost']],
             mode='lines',
-            line=dict(width=0.5)
+            name=f"{row['name']} ({row['type']})",
+            line=dict(width=3),
+            hovertemplate=f"{row['name']}<br>Capacity: {row['capacity_mw']} MW<br>Cost: €{row['marginal_cost']:.1f}/MWh<extra></extra>"
         ))
+        
+        cumulative_capacity = end_capacity
+    
+    # Add current price line
+    current_price = 60  # You can pass this as parameter
+    fig.add_hline(
+        y=current_price, 
+        line_dash="dash", 
+        line_color="red",
+        annotation_text=f"Market Price: €{current_price}/MWh"
+    )
     
     fig.update_layout(
-        title="Merit Order Curve",
+        title="Merit Order Curve - Asset Dispatch Economics",
         xaxis_title="Cumulative Capacity (MW)",
         yaxis_title="Marginal Cost (EUR/MWh)",
         template=PLOT_THEME,
-        showlegend=True
+        height=500,
+        showlegend=False
     )
     
     return fig
@@ -340,23 +392,78 @@ def create_correlation_matrix(correlation_data):
     
     return fig
 
+# def create_dispatch_optimization_chart(dispatch_schedule):
+#     """
+#     Create dispatch optimization visualization
+#     """
+#     fig = px.bar(
+#         dispatch_schedule.groupby('asset')['profit'].sum().reset_index(),
+#         x='asset',
+#         y='profit',
+#         title="Optimized Dispatch Profits by Asset",
+#         template=PLOT_THEME
+#     )
+    
+#     fig.update_layout(
+#         xaxis_title="Asset",
+#         yaxis_title="Total Profit (EUR)",
+#         xaxis_tickangle=-45
+#     )
+    
+#     return fig
+
+
+
+
+
 def create_dispatch_optimization_chart(dispatch_schedule):
     """
     Create dispatch optimization visualization
     """
+    if dispatch_schedule.empty:
+        return go.Figure().add_annotation(text="No dispatch data available", showarrow=False)
+    
+    # Check if 'name' column exists (from dispatch_economics) or 'asset' (from optimization)
+    asset_col = 'name' if 'name' in dispatch_schedule.columns else 'asset'
+    
+    # Filter only profitable assets
+    profitable_assets = dispatch_schedule[dispatch_schedule['should_dispatch'] == True]
+    
+    if profitable_assets.empty:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No profitable dispatch opportunities with current prices",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14)
+        )
+        return fig
+    
+    # Group by asset/name and sum profits
+    profit_data = profitable_assets.groupby(asset_col)['hourly_profit'].sum().reset_index()
+    
+    # Sort by profit descending
+    profit_data = profit_data.sort_values('hourly_profit', ascending=True)
+    
     fig = px.bar(
-        dispatch_schedule.groupby('asset')['profit'].sum().reset_index(),
-        x='asset',
-        y='profit',
-        title="Optimized Dispatch Profits by Asset",
-        template=PLOT_THEME
+        profit_data,
+        x=asset_col,
+        y='hourly_profit',
+        title="Dispatch Profits by Asset",
+        template=PLOT_THEME,
+        color='hourly_profit',
+        color_continuous_scale=['red', 'yellow', 'green']
     )
     
     fig.update_layout(
-        xaxis_title="Asset",
-        yaxis_title="Total Profit (EUR)",
-        xaxis_tickangle=-45
+        xaxis_title="Asset Name",
+        yaxis_title="Hourly Profit (EUR)",
+        xaxis_tickangle=-45,
+        height=400
     )
+    
+    # Add value labels on bars
+    fig.update_traces(texttemplate='%{y:,.0f}', textposition='outside')
     
     return fig
 

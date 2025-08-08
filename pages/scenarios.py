@@ -8,7 +8,8 @@ import numpy as np
 
 # Import our modules
 from data.sample_assets import get_sample_assets
-from data.market_data import get_market_overview, forecast_prices
+from data.market_data import get_market_overview
+from models.market_analysis import forecast_prices
 from models.financial_models import calculate_asset_dcf
 from models.optimization import scenario_optimization, optimize_dispatch_schedule, calculate_hedging_strategy
 from utils.visualization import create_scenario_analysis_chart, create_price_chart
@@ -48,8 +49,33 @@ def show_scenarios():
             show_hedging_strategy(assets_df, market_data, price_data)
         
     except Exception as e:
-        st.error(f"❌ Error in scenario analysis: {str(e)}")
-        st.info("💡 **Tip:** Ensure all data connections are working and try refreshing.")
+        import traceback
+        import sys
+        
+        # Get full traceback
+        tb = traceback.format_exc()
+        st.error("❌ Error in scenario analysis")
+        
+        # Show exact line and file
+        st.error(f"**Error Type:** {type(e).__name__}")
+        st.error(f"**Error Message:** {str(e)}")
+        
+        # Extract line number from traceback
+        tb_lines = tb.split('\n')
+        relevant_line = None
+        for line in tb_lines:
+            if 'scenarios.py' in line:
+                relevant_line = line.strip()
+                break
+        
+        if relevant_line:
+            st.error(f"**Location:** {relevant_line}")
+        
+        # Show full traceback in expander
+        with st.expander("🔍 View Full Error Details"):
+            st.code(tb, language='python')
+        
+        st.info("💡 **Tip:** Check the error location above for specific debugging")
 
 def show_market_scenarios(assets_df, market_data):
     """
@@ -100,25 +126,51 @@ def show_market_scenarios(assets_df, market_data):
     # Calculate portfolio value under each scenario
     st.markdown("---")
     st.subheader("💰 Portfolio Valuation by Scenario")
-    
+
     scenario_results = []
-    
+
     for scenario_name, scenario_params in scenarios.items():
-        portfolio_npv = 0
-        asset_values = []
-        
-        for _, asset in assets_df.iterrows():
-            dcf_result = calculate_asset_dcf(asset, scenario_params)
-            portfolio_npv += dcf_result['npv']
-            asset_values.append(dcf_result['npv'])
-        
-        scenario_results.append({
-            'scenario_name': scenario_name,
-            'portfolio_value': portfolio_npv / 1e6,  # Convert to millions
-            'weight': scenario_params['probability'],
-            'asset_values': asset_values
-        })
-    
+        try:
+            portfolio_npv = 0
+            asset_values = []
+            
+            # Calculate NPV for each asset under this scenario
+            for _, asset in assets_df.iterrows():
+                try:
+                    dcf_result = calculate_asset_dcf(asset, scenario_params)
+                    if dcf_result and 'npv' in dcf_result:
+                        portfolio_npv += dcf_result['npv']
+                        asset_values.append(dcf_result['npv'])
+                    else:
+                        st.warning(f"Missing NPV for {asset['name']} in {scenario_name}")
+                        asset_values.append(0)
+                except Exception as e:
+                    st.error(f"Error calculating DCF for {asset['name']}: {str(e)}")
+                    asset_values.append(0)
+            
+            # Ensure portfolio_value is always calculated
+            scenario_results.append({
+                'scenario_name': scenario_name,
+                'portfolio_value': portfolio_npv / 1e6,  # Convert to millions
+                'weight': scenario_params['probability'],
+                'asset_values': asset_values
+            })
+            
+        except Exception as e:
+            st.error(f"Error processing scenario {scenario_name}: {str(e)}")
+            scenario_results.append({
+                'scenario_name': scenario_name,
+                'portfolio_value': 0,
+                'weight': scenario_params['probability'],
+                'asset_values': [0] * len(assets_df)
+            })
+
+    # Verify scenario results structure
+    if scenario_results:
+        with st.expander("🔍 Debug: Scenario Results"):
+            for i, result in enumerate(scenario_results):
+                st.write(f"**{result['scenario_name']}**: €{result['portfolio_value']:.1f}M (weight: {result['weight']})")
+
     # Display results
     col1, col2 = st.columns([2, 1])
     
@@ -171,13 +223,22 @@ def show_market_scenarios(assets_df, market_data):
             st.markdown("• Portfolio shows positive expected value across scenarios")
         else:
             st.markdown("• Portfolio faces headwinds in current market outlook")
+
+        # ✅ FIXED: Use scenario_results instead of scenarios
+        try:
+            green_scenario = next(r for r in scenario_results if r['scenario_name'] == 'Green Transition')
+            base_scenario = next(r for r in scenario_results if r['scenario_name'] == 'Base Case')
+            high_scenario = next(r for r in scenario_results if r['scenario_name'] == 'High Price')
+            low_scenario = next(r for r in scenario_results if r['scenario_name'] == 'Low Price')
+
+            high_carbon_impact = green_scenario['portfolio_value'] - base_scenario['portfolio_value']
+            if abs(high_carbon_impact) > 100:
+                st.markdown("• Significant exposure to carbon price risk")
             
-        high_carbon_impact = scenarios['Green Transition']['portfolio_value'] - scenarios['Base Case']['portfolio_value']
-        if abs(high_carbon_impact) > 100:
-            st.markdown("• Significant exposure to carbon price risk")
-        
-        price_sensitivity = scenarios['High Price']['portfolio_value'] - scenarios['Low Price']['portfolio_value']
-        st.markdown(f"• Portfolio value range: €{price_sensitivity:.0f}M across price scenarios")
+            price_sensitivity = high_scenario['portfolio_value'] - low_scenario['portfolio_value']
+            st.markdown(f"• Portfolio value range: €{price_sensitivity:.0f}M across price scenarios")
+        except StopIteration:
+            st.markdown("• Scenario data incomplete for strategic analysis")
     
     with col2:
         st.markdown("**📈 Recommendations:**")
@@ -185,8 +246,14 @@ def show_market_scenarios(assets_df, market_data):
         if worst_case < -500:
             st.markdown("• Consider downside protection strategies")
         
-        if scenarios['Green Transition']['portfolio_value'] < scenarios['Base Case']['portfolio_value']:
-            st.markdown("• Evaluate renewable energy investments")
+        try:
+            green_scenario = next(r for r in scenario_results if r['scenario_name'] == 'Green Transition')
+            base_scenario = next(r for r in scenario_results if r['scenario_name'] == 'Base Case')
+            
+            if green_scenario['portfolio_value'] < base_scenario['portfolio_value']:
+                st.markdown("• Evaluate renewable energy investments")
+        except StopIteration:
+            pass
         
         st.markdown("• Monitor carbon price developments closely")
         st.markdown("• Consider scenario-based hedging strategies")

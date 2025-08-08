@@ -54,7 +54,7 @@ def generate_synthetic_price_data(days_back=7):
     timestamps = pd.date_range(
         start=datetime.now() - timedelta(days=days_back), 
         periods=hours, 
-        freq='H'
+        freq='h'
     )
     
     # Create realistic price pattern
@@ -110,7 +110,7 @@ def fetch_carbon_prices():
     try:
         # Using a carbon price approximation
         # In real implementation, you'd use specific carbon futures data
-        carbon = yf.Ticker("EUCA")  # This might not work, fallback to synthetic
+        carbon = yf.Ticker("^ICEEUA")  # This might not work, fallback to synthetic
         hist = carbon.history(period="1mo")
         
         if not hist.empty:
@@ -176,3 +176,90 @@ def parse_entso_e_response(xml_data):
     # This is a placeholder - real implementation would parse XML
     # For now, return synthetic data
     return generate_synthetic_price_data(7)
+
+### got this code from kimi
+@st.cache_data(ttl=300) 
+def fetch_instant_european_data():
+    """
+    Fallback function for immediate European market data
+    Uses synthetic data that looks realistic for demo purposes
+    """
+    print('I am in this function fetch_instant_european_data')
+    return generate_synthetic_price_data(7)
+
+@st.cache_data(ttl=600)
+def fetch_nordpool_prices():
+    """
+    Fetch Nord Pool day-ahead prices for Germany (immediate source)
+    """
+    try:
+        # Nord Pool API for Germany/Luxembourg bidding zone
+        url = "https://www.nordpoolgroup.com/api/marketdata/page/10"
+        params = {"currency": "EUR"}
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'data' in data and 'Rows' in data['data']:
+                rows = data['data']['Rows']
+                prices = []
+                timestamps = []
+                
+                for row in rows:
+                    if 'Columns' in row and len(row['Columns']) > 1:
+                        try:
+                            price = float(row['Columns'][1]['Value'].replace(',', '.'))
+                            hour = int(row['Name'].split('-')[0])
+                            timestamp = datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
+                            prices.append(price)
+                            timestamps.append(timestamp)
+                        except:
+                            continue
+                
+                if prices and timestamps:
+                    return pd.DataFrame({
+                        'timestamp': timestamps,
+                        'price_eur_mwh': prices,
+                        'country': 'Germany'
+                    })
+    except:
+        pass
+    print('I am in this function Fetch _northpool _prices')
+    return generate_synthetic_price_data(7)
+
+def generate_enhanced_synthetic_data(days=30):
+    """
+    Enhanced synthetic data with more realistic patterns
+    """
+    print('I am in this function Generic _innant _synthetic _data')
+    hours = days * 24
+    timestamps = pd.date_range(
+        start=datetime.now() - timedelta(days=days), 
+        periods=hours, 
+        freq='h'
+    )
+    
+    # More sophisticated patterns
+    base_price = 68.5
+    daily_pattern = np.sin(np.arange(hours) * 2 * np.pi / 24) * 25
+    weekly_pattern = np.sin(np.arange(hours) * 2 * np.pi / (24 * 7)) * 12
+    seasonal_pattern = np.sin(np.arange(hours) * 2 * np.pi / (24 * 30)) * 8
+    
+    # Add realistic volatility
+    volatility = np.random.normal(0, 6, hours)
+    
+    # Combine patterns
+    prices = base_price + daily_pattern + weekly_pattern + seasonal_pattern + volatility
+    prices = np.maximum(prices, 8)  # Ensure minimum price
+    
+    # Add correlated gas and carbon prices
+    gas_prices = 42 + np.random.normal(0, 4, hours) + (prices - base_price) * 0.3
+    carbon_prices = 82 + np.random.normal(0, 5, hours) + (prices - base_price) * 0.2
+    
+    return pd.DataFrame({
+        'timestamp': timestamps,
+        'price_eur_mwh': prices,
+        'country': 'Germany',
+        'gas_price': np.maximum(gas_prices, 25),
+        'carbon_price': np.maximum(carbon_prices, 50)
+    })

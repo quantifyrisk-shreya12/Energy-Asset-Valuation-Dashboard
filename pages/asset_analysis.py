@@ -13,6 +13,7 @@ from utils.visualization import (create_asset_performance_dashboard, create_meri
                                create_portfolio_pie_chart, create_dispatch_optimization_chart)
 from utils.calculations import format_currency, calculate_capacity_factor
 
+
 def show_asset_analysis():
     """
     Display asset analysis dashboard
@@ -139,6 +140,10 @@ def show_asset_analysis():
         st.subheader("⚡ Current Dispatch Economics")
         
         dispatch_results = calculate_dispatch_economics(assets_df, market_data)
+
+        print(dispatch_results)
+
+        
         
         col1, col2 = st.columns([2, 1])
         
@@ -146,7 +151,9 @@ def show_asset_analysis():
             # Dispatch profitability chart
             dispatch_chart = create_dispatch_optimization_chart(dispatch_results)
             st.plotly_chart(dispatch_chart, use_container_width=True)
-            
+        
+        print("i am in line 153")
+
         with col2:
             st.markdown("**Current Dispatch Status**")
             

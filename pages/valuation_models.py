@@ -61,11 +61,20 @@ def show_valuation_models():
             )
             
         with col2:
+            # gas_price_assumption = st.number_input(
+            #     "Gas Price (EUR/MWh)",
+            #     min_value=10.0,
+            #     max_value=100.0,
+            #     value=float(market_data['gas_price']),
+            #     step=1.0
+            # )
+
+            # ✅ NEW (fixed range):
             gas_price_assumption = st.number_input(
                 "Gas Price (EUR/MWh)",
                 min_value=10.0,
-                max_value=100.0,
-                value=float(market_data['gas_price']),
+                max_value=500.0,      # 🔄 Increased to handle current market prices
+                value=min(float(market_data['gas_price']), 500.0),  # 🔄 Ensure value within range
                 step=1.0
             )
             
@@ -114,9 +123,40 @@ def show_valuation_models():
         st.markdown("---")
         show_portfolio_valuation(assets_df, market_assumptions)
         
+    # except Exception as e:
+    #     st.error(f"❌ Error in valuation models: {str(e)}")
+    #     st.info("💡 **Tip:** Check that all required data is available and try refreshing.")
+
+
+
+
     except Exception as e:
-        st.error(f"❌ Error in valuation models: {str(e)}")
-        st.info("💡 **Tip:** Check that all required data is available and try refreshing.")
+        import traceback
+        import sys
+        
+        # Get full traceback
+        tb = traceback.format_exc()
+        
+        # Show exact line and file
+        st.error(f"**Error Type:** {type(e).__name__}")
+        st.error(f"**Error Message:** {str(e)}")
+        
+        # Extract line number from traceback
+        tb_lines = tb.split('\n')
+        relevant_line = None
+        for line in tb_lines:
+            if 'valuation_models.py' in line:
+                relevant_line = line.strip()
+                break
+        
+        if relevant_line:
+            st.error(f"**Location:** {relevant_line}")
+        
+        # Show full traceback in expander
+        with st.expander("🔍 View Full Error Details"):
+            st.code(tb, language='python')
+        
+        st.info("💡 **Tip:** Check the error location above for specific debugging")
 
 def show_dcf_analysis(asset_data, market_assumptions):
     """
