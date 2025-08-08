@@ -151,6 +151,7 @@ def fetch_weather_data(city="Berlin"):
                 'solar_irradiance': max(0, 1000 * (1 - data['clouds']['all'] / 100)),
                 'timestamp': datetime.now()
             }
+        print("using actual weather data")
     except:
         pass
     
