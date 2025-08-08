@@ -35,6 +35,7 @@ TAX_RATE = 0.25
 INFLATION_RATE = 0.02
 
 # Visualization settings
+# Visualization settings
 PLOT_THEME = 'plotly_white'
-PRIMARY_COLOR = '#1f77b4'
-SECONDARY_COLOR = '#ff7f0e'
+PRIMARY_COLOR = '#004F9F'  # Uniper Blue
+SECONDARY_COLOR = '#768692' # Professional Grey Accent

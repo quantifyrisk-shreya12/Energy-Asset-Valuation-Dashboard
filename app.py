@@ -23,12 +23,11 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Custom CSS
     st.markdown("""
     <style>
     .main-header {
         font-size: 2.5rem;
-        color: #1f77b4;
+        color: #004F9F;  /* Changed to Uniper Blue */
         text-align: center;
         margin-bottom: 2rem;
     }
@@ -43,10 +42,36 @@ def main():
     }
     </style>
     """, unsafe_allow_html=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
     # Main header
-    st.markdown('<h1 class="main-header">⚡ Energy Asset Valuation Dashboard</h1>', unsafe_allow_html=True)
-    
+    st.markdown('<h1 class="main-header">Uniper | Energy Asset Valuation Dashboard</h1>', unsafe_allow_html=True)    
     # Sidebar navigation
     st.sidebar.title("🧭 Navigation")
     st.sidebar.markdown("---")
@@ -67,15 +92,10 @@ def main():
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📋 About This Dashboard")
     st.sidebar.info("""
-    This dashboard demonstrates comprehensive energy asset 
-    strategy and valuation capabilities, including:
-    
-    • Real-time market data analysis
-    • Asset performance monitoring  
-    • DCF and valuation models
-    • Portfolio optimization
-    • Risk assessment
-    • Scenario planning
+    This dashboard provides strategic insights to help Uniper achieve its two main missions:
+
+    • **Ensure Supply Security:** Through detailed asset performance, dispatch optimization, and risk assessment.
+    • **Accelerate the Energy Transition:** By enabling robust scenario planning and financial modeling for new investments.
     """)
     
     # Page routing
